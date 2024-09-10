@@ -1,0 +1,18 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-Wall",
+      "-Wextra",
+      "-std=c11",
+      "-Iinclude",
+      "-c",
+      "-o",
+      "build/main.o",
+      "src/main.c"
+    ],
+    "directory": "/Users/vasilieiosvamvakas/Documents/projects/mydb",
+    "file": "/Users/vasilieiosvamvakas/Documents/projects/mydb/src/main.c",
+    "output": "/Users/vasilieiosvamvakas/Documents/projects/mydb/build/main.o"
+  }
+]
