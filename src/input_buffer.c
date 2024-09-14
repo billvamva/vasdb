@@ -1,6 +1,8 @@
 #include "inputBuffer.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <strings.h>
 #include <time.h>
 
 InputBuffer* NewInputBuffer()
@@ -36,4 +38,15 @@ void CloseInputBuffer(InputBuffer* inputBuffer)
 {
     free(inputBuffer->buffer);
     free(inputBuffer);
+}
+
+MetaCommandResult ExecuteMetaCommand(InputBuffer* inputBuffer)
+{
+    if (strcmp(inputBuffer->buffer, ".exit") == 0) {
+        CloseInputBuffer(inputBuffer);
+        exit(EXIT_SUCCESS);
+    } else {
+        printf("unrecognised command %s\n", inputBuffer->buffer);
+        return META_COMMAND_UNRECOGNISED;
+    }
 }

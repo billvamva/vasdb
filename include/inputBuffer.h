@@ -10,9 +10,15 @@ typedef struct {
     ssize_t inputSize;
 } InputBuffer;
 
+typedef enum {
+    META_COMMAND_SUCCESS,
+    META_COMMAND_UNRECOGNISED
+} MetaCommandResult;
+
 InputBuffer* NewInputBuffer();
 void PrintPrompt();
 void ReadInput(InputBuffer*);
 void CloseInputBuffer(InputBuffer*);
+MetaCommandResult ExecuteMetaCommand(InputBuffer*);
 
 #endif /* ifndef INPUT_BUFFER_H */

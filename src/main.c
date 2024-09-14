@@ -1,8 +1,9 @@
 #include "inputBuffer.h"
+#include <assert.h>
+#include <sqlcompiler.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 int main()
 {
@@ -12,11 +13,31 @@ int main()
         PrintPrompt();
         ReadInput(inputBuffer);
 
-        if (strcmp(inputBuffer->buffer, ".exit") == 0) {
-            CloseInputBuffer(inputBuffer);
-            exit(EXIT_SUCCESS);
-        } else {
-            printf("unrecognised command %s\n", inputBuffer->buffer);
+        if (inputBuffer->buffer[0] == '.') {
+            switch (ExecuteMetaCommand(inputBuffer)) {
+            case META_COMMAND_SUCCESS:
+                continue;
+            case META_COMMAND_UNRECOGNISED:
+                printf("command not recognised\n");
+                continue;
+            }
         }
+
+        Statement* statement = (Statement*)malloc(sizeof(Statement));
+        assert(statement);
+        switch (PrepareStatement(inputBuffer, statement)) {
+        case PREPARE_SUCCESS:
+            break;
+        case PREPARE_FAILURE:
+            printf("unrecognised statement\n");
+            continue;
+        case PREPARE_SYNTAX_ERROR:
+            printf("syntax error in statement\n");
+            continue;
+        }
+
+        ExecuteStatement(statement);
+        printf("statement executed\n");
+        free(statement);
     }
 }
