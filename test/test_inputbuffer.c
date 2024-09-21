@@ -1,4 +1,4 @@
-#include "inputBuffer.h" // The module you're testing
+#include "inputBuffer.h"
 #include "minunit.h"
 #include <assert.h>
 #include <stdio.h>

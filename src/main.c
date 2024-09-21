@@ -1,12 +1,13 @@
 #include "inputBuffer.h"
+#include "sqlcompiler.h"
 #include <assert.h>
-#include <sqlcompiler.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 int main()
 {
+    Table* table = NewTable();
     InputBuffer* inputBuffer = NewInputBuffer();
 
     while (true) {
@@ -36,8 +37,14 @@ int main()
             continue;
         }
 
-        ExecuteStatement(statement);
-        printf("statement executed\n");
+        switch (ExecuteStatement(statement, table)) {
+        case EXECUTE_SUCCESS:
+            printf("Executed. \n");
+            break;
+        case EXECUTE_TABLE_FULL:
+            printf("Error, Table Full");
+            break;
+        }
         free(statement);
     }
 }
