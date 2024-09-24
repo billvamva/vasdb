@@ -12,7 +12,7 @@ typedef struct {
 } Pager;
 
 Pager* OpenPager(const char*);
-void* GetPage(Pager*, int);
+void* GetPage(Pager*, uint32_t);
 void FlushPager(Pager*, uint32_t, uint32_t);
 
 #endif /* ifndef PAGER_H */
