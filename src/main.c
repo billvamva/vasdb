@@ -5,9 +5,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int main()
+int main(int argc, char* argv[])
 {
-    Table* table = NewTable();
+    if (argc < 2) {
+        printf("must supply db file name \n");
+        exit(EXIT_FAILURE);
+    }
+    Table* table = InitDatabase(argv[1]);
     InputBuffer* inputBuffer = NewInputBuffer();
 
     while (true) {
@@ -15,7 +19,7 @@ int main()
         ReadInput(inputBuffer);
 
         if (inputBuffer->buffer[0] == '.') {
-            switch (ExecuteMetaCommand(inputBuffer)) {
+            switch (ExecuteMetaCommand(inputBuffer, table)) {
             case META_COMMAND_SUCCESS:
                 continue;
             case META_COMMAND_UNRECOGNISED:
@@ -34,6 +38,15 @@ int main()
             continue;
         case PREPARE_SYNTAX_ERROR:
             printf("syntax error in statement\n");
+            continue;
+        case PREPARE_STRING_TOO_LONG:
+            printf("string exceeds max length\n");
+            continue;
+        case PREPARE_INVALID_ID:
+            printf("id is invalid\n");
+            continue;
+        case PREPARE_MEMORY_ERROR:
+            printf("memory allocation error\n");
             continue;
         }
 

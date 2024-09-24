@@ -19,6 +19,5 @@ InputBuffer* NewInputBuffer();
 void PrintPrompt();
 void ReadInput(InputBuffer*);
 void CloseInputBuffer(InputBuffer*);
-MetaCommandResult ExecuteMetaCommand(InputBuffer*);
 
 #endif /* ifndef INPUT_BUFFER_H */

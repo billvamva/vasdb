@@ -2,6 +2,7 @@
 #define SQL_COMPILER_H
 
 #include "inputBuffer.h"
+#include "pager.h"
 #include <stdint.h>
 
 #define COLUMN_USERNAME_SIZE 32 // varchar(32)
@@ -16,7 +17,10 @@ extern const uint32_t PAGE_SIZE;
 typedef enum {
     PREPARE_SUCCESS,
     PREPARE_FAILURE,
-    PREPARE_SYNTAX_ERROR
+    PREPARE_SYNTAX_ERROR,
+    PREPARE_MEMORY_ERROR,
+    PREPARE_INVALID_ID,
+    PREPARE_STRING_TOO_LONG,
 } PrepareResult;
 
 typedef enum {
@@ -49,9 +53,14 @@ typedef struct {
 
 typedef struct {
     uint32_t numRows;
-    void* pages[TABLE_MAX_PAGES];
+    Pager* pager;
 } Table;
 
+MetaCommandResult ExecuteMetaCommand(InputBuffer*, Table*);
+void InsertDataToStatement(Statement*, int, const char*, const char*);
+int IsValidId(const char*);
+int AreStringsValid(const char*, const char*);
+PrepareResult PrepareInsert(char*, char*, char*, Statement*);
 PrepareResult PrepareStatement(InputBuffer* inputBuffer, Statement* statement);
 ExecuteResult ExecuteStatement(Statement* statement, Table* table);
 ExecuteResult ExecuteInsert(Statement* statement, Table* table);
@@ -60,7 +69,7 @@ void FreeStatement(Statement* statement);
 void SerialiseRow(Row* source, void* destination, const Field fields[]);
 void DeserialiseRow(void* source, Row* destination, const Field fields[]);
 void* GetRowSlot(Table* table, uint32_t rowNum);
-Table* NewTable();
-void FreeTable(Table* table);
+Table* InitDatabase(const char* fileName);
+void CloseDatabase(Table* table);
 
 #endif /* SQL_COMPILER_H */

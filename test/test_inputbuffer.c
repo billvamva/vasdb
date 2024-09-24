@@ -2,8 +2,7 @@
 #include "minunit.h"
 #include <assert.h>
 #include <stdio.h>
-
-int tests_run = 0;
+#include <string.h>
 
 static char* test_new_input_buffer()
 {
@@ -18,21 +17,36 @@ static char* test_new_input_buffer()
     return 0;
 }
 
-static char* all_tests()
+static char* test_read_input()
 {
-    mu_run_test(test_new_input_buffer);
+    InputBuffer* buffer = NewInputBuffer();
+
+    // Simulate user input
+    FILE* temp = tmpfile();
+    fprintf(temp, "test input\n");
+    rewind(temp);
+
+    // Redirect stdin to our temp file
+    FILE* old_stdin = stdin;
+    stdin = temp;
+
+    ReadInput(buffer);
+
+    mu_assert("error, input not read correctly", strcmp(buffer->buffer, "test input") == 0);
+    mu_assert("error, inputSize incorrect", buffer->inputSize == 10);
+    mu_assert("error, bufferSize not updated", buffer->bufferSize > 0);
+
+    // Restore stdin
+    stdin = old_stdin;
+    fclose(temp);
+
+    CloseInputBuffer(buffer);
     return 0;
 }
 
-int main()
+char* run_input_buffer_tests()
 {
-    char* result = all_tests();
-    if (result != 0) {
-        printf("%s\n", result);
-    } else {
-        printf("ALL TESTS PASSED\n");
-    }
-    printf("Tests run: %d\n", tests_run);
-
-    return result != 0;
+    mu_run_test(test_new_input_buffer);
+    mu_run_test(test_read_input);
+    return 0;
 }
