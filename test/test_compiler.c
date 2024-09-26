@@ -1,8 +1,15 @@
+#include "common.h"
+#include "execution.h"
+#include "inputBuffer.h"
 #include "minunit.h"
-#include "sqlcompiler.h"
+#include "row.h"
+#include "statement.h"
+#include "table.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <unistd.h>
 
 static char* test_prepare_insert()
 {
@@ -47,27 +54,38 @@ static char* test_prepare_unrecognized_statement()
 
 static char* test_execute_insert()
 {
-    Table* table = NewTable();
+    char fileName[] = "tempXXXXXX";
+    int fd = mkstemp(fileName);
+
+    Table* table = InitDatabase(fileName);
     Statement statement = {
         .StatementType = STATEMENT_INSERT,
         .RowOperation.Insert = &(Row) { 1, "user1", "user1@example.com" }
     };
     ExecuteResult result = ExecuteInsert(&statement, table);
+    printf("result output: %d \n", result);
     mu_assert("execute insert failed", result == EXECUTE_SUCCESS);
     mu_assert("row count didn't increase", table->numRows == 1);
 
-    Row* inserted_row = (Row*)GetRowSlot(table, 0);
-    mu_assert("inserted id is wrong", inserted_row->id == 1);
+    Cursor* cursor = CreateStartCursor(table);
+
+    Row* inserted_row = (Row*)GetCursorPosition(cursor);
+    mu_assert("inserted id is wrong\n", inserted_row->id == 1);
     mu_assert("inserted username is wrong", strcmp(inserted_row->username, "user1") == 0);
     mu_assert("inserted email is wrong", strcmp(inserted_row->email, "user1@example.com") == 0);
 
-    FreeTable(table);
+    CloseDatabase(table);
+    close(fd);
+    unlink(fileName);
     return 0;
 }
 
 static char* test_execute_select()
 {
-    Table* table = NewTable();
+    char fileName[] = "tempXXXXXX";
+    int fd = mkstemp(fileName);
+
+    Table* table = InitDatabase(fileName);
     Statement insert_statement = {
         .StatementType = STATEMENT_INSERT,
         .RowOperation.Insert = &(Row) { 1, "user1", "user1@example.com" }
@@ -78,13 +96,18 @@ static char* test_execute_select()
     ExecuteResult result = ExecuteStatement(&select_statement, table);
     mu_assert("execute select failed", result == EXECUTE_SUCCESS);
 
-    FreeTable(table);
+    CloseDatabase(table);
+    close(fd);
+    unlink(fileName);
     return 0;
 }
 
 static char* test_table_full()
 {
-    Table* table = NewTable();
+    char fileName[] = "tempXXXXXX";
+    int fd = mkstemp(fileName);
+
+    Table* table = InitDatabase(fileName);
     Statement statement = {
         .StatementType = STATEMENT_INSERT,
         .RowOperation.Insert = &(Row) { 1, "user1", "user1@example.com" }
@@ -97,7 +120,9 @@ static char* test_table_full()
     ExecuteResult result = ExecuteInsert(&statement, table);
     mu_assert("didn't catch table full", result == EXECUTE_TABLE_FULL);
 
-    FreeTable(table);
+    CloseDatabase(table);
+    close(fd);
+    unlink(fileName);
     return 0;
 }
 

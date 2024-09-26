@@ -1,5 +1,8 @@
+#include "common.h"
+#include "execution.h"
 #include "inputBuffer.h"
-#include "sqlcompiler.h"
+#include "statement.h"
+#include "table.h"
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>

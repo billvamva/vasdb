@@ -1,5 +1,5 @@
 #include "pager.h"
-#include "sqlcompiler.h"
+#include "common.h"
 #include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
