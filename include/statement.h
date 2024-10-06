@@ -15,9 +15,9 @@ typedef struct {
     } RowOperation;
 } Statement;
 
-void InsertDataToStatement(Statement*, int, const char*, const char*);
+void InsertDataToStatement(Statement*, int id, const char* username, const char* email);
 int IsValidId(const char*);
-int AreStringsValid(const char*, const char*);
+int AreStringsValid(const char* username, const char* email);
 void FreeStatement(Statement* statement);
 
 #endif /* STATEMENT_H */

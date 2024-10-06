@@ -1,6 +1,8 @@
 #include "table.h"
+#include "btree.h"
 #include "common.h"
-#include "row.h"
+#include "pager.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -9,35 +11,28 @@ Table* InitDatabase(const char* fileName)
 {
     Pager* pager = OpenPager(fileName);
     Table* table = (Table*)malloc(sizeof(Table));
-    uint32_t numRows = pager->fileLength / sizeof(Row);
-    table->numRows = numRows;
     table->pager = pager;
+    table->rootPageNum = 0;
+
+    if (table->pager->numPages == 0) {
+        void* node = GetPage(table->pager, table->rootPageNum);
+        NodeLayout layout = InitNodeLayout();
+        InitialiseLeafNode(node, &layout);
+    }
 
     return table;
 }
 
 void CloseDatabase(Table* table)
 {
-    uint32_t numFullPages = table->numRows / ROWS_PER_PAGE;
-    for (uint32_t i = 0; i < numFullPages; i++) {
+    for (uint32_t i = 0; i < table->pager->numPages; i++) {
         if (table->pager->pages[i] == NULL) {
             continue;
         }
-        FlushPager(table->pager, i, PAGE_SIZE);
+        FlushPager(table->pager, i);
         free(table->pager->pages[i]);
         table->pager->pages[i] = NULL;
     }
-    // TODO: Remove when B tree is implemented
-    uint32_t numAdditionalRows = table->numRows % ROWS_PER_PAGE;
-    if (numAdditionalRows > 0) {
-        uint32_t pageNum = numFullPages;
-        if (table->pager->pages[pageNum] != NULL) {
-            FlushPager(table->pager, pageNum, numAdditionalRows * sizeof(Row));
-            free(table->pager->pages[pageNum]);
-            table->pager->pages[pageNum] = NULL;
-        }
-    }
-
     int cd = close(table->pager->fileDescriptor);
 
     if (cd == -1) {
@@ -60,21 +55,39 @@ void CloseDatabase(Table* table)
 
 void* GetCursorPosition(Cursor* cursor)
 {
-    uint32_t pageNum = cursor->rowNum / ROWS_PER_PAGE;
-    void* page = GetPage(cursor->table->pager, pageNum);
-    uint32_t rowOffset = cursor->rowNum % ROWS_PER_PAGE;
-    uint32_t byteOffset = rowOffset * sizeof(Row);
-
-    return page + byteOffset;
+    void* page = GetPage(cursor->table->pager, cursor->pageNum);
+    return page;
 }
 
+/*
+Creates cursor at the start of the table
+*/
 Cursor* CreateStartCursor(Table* table)
 {
     Cursor* cursor = (Cursor*)malloc(sizeof(Cursor));
 
-    cursor->rowNum = 0;
     cursor->table = table;
-    cursor->endOfTable = (table->numRows == 0);
+    cursor->pageNum = table->rootPageNum;
+    cursor->cellNum = 0;
+
+    void* page = GetCursorPosition(cursor);
+    NodeLayout layout = InitNodeLayout();
+    uint32_t numCells = *(GetLeafNodeNumCells(page, &layout));
+
+    cursor->endOfTable = (numCells == 0);
+
+    return cursor;
+}
+
+// Creating Cursor in the position where the key would be inserted
+Cursor* CreateKeyCursor(Table* table, uint32_t key)
+{
+    Cursor* cursor = (Cursor*)malloc(sizeof(Cursor));
+    uint32_t rootPageNum = table->rootPageNum;
+    void* rootNode = GetPage(table->pager, rootPageNum);
+    cursor->cellNum = FindLeafNodeIndex(rootNode, key);
+    cursor->table = table;
+    cursor->pageNum = rootPageNum;
 
     return cursor;
 }
@@ -83,17 +96,39 @@ Cursor* CreateEndCursor(Table* table)
 {
     Cursor* cursor = (Cursor*)malloc(sizeof(Cursor));
 
-    cursor->rowNum = table->numRows;
     cursor->table = table;
+    cursor->pageNum = table->rootPageNum;
     cursor->endOfTable = true;
+
+    NodeLayout layout = InitNodeLayout();
+    void* page = GetPage(table->pager, cursor->pageNum);
+
+    uint32_t cellNum = *GetLeafNodeNumCells(page, &layout);
+
+    cursor->cellNum = cellNum;
 
     return cursor;
 }
 
+void* GetCursorValue(Cursor* cursor)
+{
+    uint32_t pageNum = cursor->pageNum;
+
+    void* node = GetPage(cursor->table->pager, pageNum);
+    NodeLayout layout = InitNodeLayout();
+
+    return GetLeafNodeValue(node, &layout, cursor->cellNum);
+}
+
 void AdvanceCursor(Cursor* cursor)
 {
-    cursor->rowNum++;
+    uint32_t pageNum = cursor->pageNum;
+    void* page = GetPage(cursor->table->pager, pageNum);
+    NodeLayout layout = InitNodeLayout();
 
-    if (cursor->rowNum >= cursor->table->numRows)
+    cursor->cellNum += 1;
+
+    if (cursor->cellNum >= *GetLeafNodeNumCells(page, &layout)) {
         cursor->endOfTable = true;
+    }
 }

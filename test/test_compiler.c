@@ -1,3 +1,4 @@
+#include "btree.h"
 #include "common.h"
 #include "execution.h"
 #include "inputBuffer.h"
@@ -63,16 +64,16 @@ static char* test_execute_insert()
         .RowOperation.Insert = &(Row) { 1, "user1", "user1@example.com" }
     };
     ExecuteResult result = ExecuteInsert(&statement, table);
-    printf("result output: %d \n", result);
     mu_assert("execute insert failed", result == EXECUTE_SUCCESS);
-    mu_assert("row count didn't increase", table->numRows == 1);
+    mu_assert("root page not created", table->rootPageNum == 0);
+    mu_assert("page number not incremented", table->pager->numPages == 1);
 
-    Cursor* cursor = CreateStartCursor(table);
-
-    Row* inserted_row = (Row*)GetCursorPosition(cursor);
-    mu_assert("inserted id is wrong\n", inserted_row->id == 1);
-    mu_assert("inserted username is wrong", strcmp(inserted_row->username, "user1") == 0);
-    mu_assert("inserted email is wrong", strcmp(inserted_row->email, "user1@example.com") == 0);
+    Statement duplicate_insert_statement = {
+        .StatementType = STATEMENT_INSERT,
+        .RowOperation.Insert = &(Row) { 1, "user2", "user2@example.com" }
+    };
+    ExecuteResult duplicateResult = ExecuteInsert(&duplicate_insert_statement, table);
+    mu_assert("duplicate key not detected", duplicateResult == EXECUTE_DUPLICATE_KEY);
 
     CloseDatabase(table);
     close(fd);
@@ -102,23 +103,47 @@ static char* test_execute_select()
     return 0;
 }
 
-static char* test_table_full()
+static char* test_leaf_node_split()
 {
     char fileName[] = "tempXXXXXX";
     int fd = mkstemp(fileName);
-
     Table* table = InitDatabase(fileName);
-    Statement statement = {
-        .StatementType = STATEMENT_INSERT,
-        .RowOperation.Insert = &(Row) { 1, "user1", "user1@example.com" }
-    };
+    NodeLayout layout = InitNodeLayout();
 
-    for (uint32_t i = 0; i < TABLE_MAX_ROWS; i++) {
-        ExecuteInsert(&statement, table);
+    // Insert enough rows to cause at least one split
+    uint32_t num_insertions = layout.LEAF_NODE_MAX_CELLS + 1;
+
+    for (uint32_t i = 0; i < num_insertions; i++) {
+        char username[32], email[255];
+        snprintf(username, sizeof(username), "user%d", i);
+        snprintf(email, sizeof(email), "user%d@example.com", i);
+
+        Row row = { i, "", "" };
+        strncpy(row.username, username, sizeof(row.username) - 1);
+        strncpy(row.email, email, sizeof(row.email) - 1);
+
+        Statement statement = {
+            .StatementType = STATEMENT_INSERT,
+            .RowOperation.Insert = &row
+        };
+
+        ExecuteResult result = ExecuteInsert(&statement, table);
+        mu_assert("Insert should succeed", result == EXECUTE_SUCCESS);
     }
 
-    ExecuteResult result = ExecuteInsert(&statement, table);
-    mu_assert("didn't catch table full", result == EXECUTE_TABLE_FULL);
+    // Verify that we have more than one page
+    mu_assert("Should have more than one page after split", table->pager->numPages > 1);
+
+    // Verify the content of the first two pages
+    void* page1 = GetPage(table->pager, 0);
+    void* page2 = GetPage(table->pager, 1);
+
+    uint32_t cells_page1 = *GetLeafNodeNumCells(page1, &layout);
+    uint32_t cells_page2 = *GetLeafNodeNumCells(page2, &layout);
+
+    mu_assert("First page should be full", cells_page1 == layout.LEAF_NODE_MAX_CELLS / 2);
+    mu_assert("Second page should have the rest of the cells",
+        cells_page1 + cells_page2 == num_insertions);
 
     CloseDatabase(table);
     close(fd);
@@ -154,7 +179,7 @@ char* run_compiler_tests()
     mu_run_test(test_prepare_unrecognized_statement);
     mu_run_test(test_execute_insert);
     mu_run_test(test_execute_select);
-    mu_run_test(test_table_full);
+    mu_run_test(test_leaf_node_split);
     mu_run_test(test_prepare_insert_long_strings);
     return 0;
 }

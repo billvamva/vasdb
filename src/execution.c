@@ -1,5 +1,9 @@
 #include "execution.h"
+#include "btree.h"
+#include "common.h"
+#include "pager.h"
 #include "table.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,6 +14,14 @@ MetaCommandResult ExecuteMetaCommand(InputBuffer* inputBuffer, Table* table)
         CloseInputBuffer(inputBuffer);
         CloseDatabase(table);
         exit(EXIT_SUCCESS);
+    } else if (strcmp(inputBuffer->buffer, ".btree") == 0) {
+        printf("Tree: \n");
+        PrintLeafNode(GetPage(table->pager, 0));
+        return META_COMMAND_SUCCESS;
+    } else if (strcmp(inputBuffer->buffer, ".constants") == 0) {
+        printf("Constants: \n");
+        PrintConstants();
+        return META_COMMAND_SUCCESS;
     } else {
         printf("unrecognised command %s\n", inputBuffer->buffer);
         return META_COMMAND_UNRECOGNISED;
@@ -95,33 +107,56 @@ const Field rowOfFields[] = {
 
 ExecuteResult ExecuteInsert(Statement* statement, Table* table)
 {
-    if (table->numRows >= TABLE_MAX_ROWS) {
+    void* page = GetPage(table->pager, table->rootPageNum);
+    NodeLayout layout = InitNodeLayout();
+    uint32_t numCells = *GetLeafNodeNumCells(page, &layout);
+    if (numCells > layout.LEAF_NODE_MAX_CELLS) {
         return EXECUTE_TABLE_FULL;
     }
 
-    Cursor* cursor = CreateEndCursor(table);
+    Row* row = statement->RowOperation.Insert;
+    uint32_t keyToInsert = row->id;
+    Cursor* cursor = CreateKeyCursor(table, keyToInsert);
+    // Cursor* cursor = CreateEndCursor(table);
 
-    SerialiseRow(statement->RowOperation.Insert, GetCursorPosition(cursor), rowOfFields);
-    table->numRows++;
+    if (cursor->cellNum < numCells) {
+        uint32_t keyAtIndex = *GetLeafNodeKey(page, &layout, cursor->cellNum);
+
+        if (keyAtIndex == keyToInsert) {
+            return EXECUTE_DUPLICATE_KEY;
+        }
+    }
+
+    InsertToLeafNode(cursor, row->id, row, rowOfFields);
+
     free(cursor);
     return EXECUTE_SUCCESS;
 }
 
+void PrintRow(Row row)
+{
+
+    printf("| %-3d | %-20s | %-30s |\n",
+        row.id,
+        row.username,
+        row.email);
+}
+
 ExecuteResult ExecuteSelect(Table* table)
 {
-    Row row;
 
     Cursor* cursor = CreateStartCursor(table);
 
+    printf("+-----------------+----------------------+--------------------------------+\n");
+    printf("| %-3s | %-20s | %-30s |\n", "id", "username", "email");
+    printf("+-----------------+----------------------+--------------------------------+\n");
     while (!cursor->endOfTable) {
-
-        DeserialiseRow(GetCursorPosition(cursor), &row, rowOfFields);
-        printf("(id=%d, username=%s, email=%s)\n",
-            row.id,
-            row.username,
-            row.email);
+        Row row;
+        DeserialiseRow(GetCursorValue(cursor), &row, rowOfFields);
+        PrintRow(row);
         AdvanceCursor(cursor);
     }
+    printf("+-----------------+----------------------+--------------------------------+\n");
 
     free(cursor);
     return EXECUTE_SUCCESS;

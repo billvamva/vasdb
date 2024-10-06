@@ -7,7 +7,7 @@
 #include "table.h"
 
 MetaCommandResult ExecuteMetaCommand(InputBuffer*, Table*);
-PrepareResult PrepareInsert(char*, char*, char*, Statement*);
+PrepareResult PrepareInsert(char* id_string, char* username, char* email, Statement*);
 PrepareResult PrepareStatement(InputBuffer* inputBuffer, Statement* statement);
 ExecuteResult ExecuteStatement(Statement* statement, Table* table);
 ExecuteResult ExecuteInsert(Statement* statement, Table* table);

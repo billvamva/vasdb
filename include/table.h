@@ -3,15 +3,17 @@
 
 #include "pager.h"
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef struct {
-    uint32_t numRows;
     Pager* pager;
+    uint32_t rootPageNum;
 } Table;
 
 typedef struct {
     Table* table;
-    uint32_t rowNum;
+    uint32_t pageNum;
+    uint32_t cellNum;
     bool endOfTable;
 } Cursor;
 
@@ -20,6 +22,8 @@ void CloseDatabase(Table* table);
 void* GetCursorPosition(Cursor* cursor);
 Cursor* CreateStartCursor(Table* table);
 Cursor* CreateEndCursor(Table* table);
+Cursor* CreateKeyCursor(Table* table, uint32_t key);
 void AdvanceCursor(Cursor* cursor);
+void* GetCursorValue(Cursor* cursor);
 
 #endif /* TABLE_H */

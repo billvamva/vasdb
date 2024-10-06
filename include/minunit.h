@@ -2,6 +2,8 @@
 #ifndef MIN_UNIT_H
 #define MIN_UNIT_H
 
+#include <stdio.h>
+
 #define mu_assert(message, test) \
     do {                         \
         if (!(test))             \

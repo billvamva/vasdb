@@ -26,13 +26,23 @@ Pager* OpenPager(const char* fileName)
     pager->fileDescriptor = fd;
     pager->fileLength = fileLength;
 
-    for (int i = 0; i < TABLE_MAX_PAGES; i++) {
+    uint32_t numPages = fileLength / PAGE_SIZE;
+
+    if (fileLength % PAGE_SIZE != 0) {
+        printf("corrupt data, file length is not a multiplier of page size\n");
+        exit(EXIT_FAILURE);
+    }
+
+    pager->numPages = numPages;
+
+    for (uint32_t i = 0; i < pager->numPages; i++) {
         pager->pages[i] = NULL;
     }
 
     return pager;
 }
 
+// Gets or inits page with standard size
 void* GetPage(Pager* pager, uint32_t pageNum)
 {
     if (pageNum > TABLE_MAX_PAGES) {
@@ -49,13 +59,15 @@ void* GetPage(Pager* pager, uint32_t pageNum)
             numPages++;
         }
 
-        if (pageNum <= numPages) {
+        if (pageNum < numPages) {
             lseek(pager->fileDescriptor, pageNum * PAGE_SIZE, SEEK_SET);
             ssize_t bytes_read = read(pager->fileDescriptor, page, PAGE_SIZE);
             if (bytes_read == -1) {
                 printf("could not read db file\n");
                 exit(EXIT_FAILURE);
             }
+        } else if (pageNum >= pager->numPages) {
+            pager->numPages = pageNum + 1;
         }
 
         pager->pages[pageNum] = page;
@@ -64,7 +76,9 @@ void* GetPage(Pager* pager, uint32_t pageNum)
     return pager->pages[pageNum];
 }
 
-void FlushPager(Pager* pager, uint32_t pageNum, uint32_t size)
+uint32_t GetUnusedPageNum(Pager* pager) { return pager->numPages; };
+
+void FlushPager(Pager* pager, uint32_t pageNum)
 {
     if (pager->pages[pageNum] == NULL) {
         printf("trying to flush null page \n");
@@ -77,7 +91,7 @@ void FlushPager(Pager* pager, uint32_t pageNum, uint32_t size)
         exit(EXIT_FAILURE);
     }
 
-    ssize_t bytesWritten = write(pager->fileDescriptor, pager->pages[pageNum], size);
+    ssize_t bytesWritten = write(pager->fileDescriptor, pager->pages[pageNum], PAGE_SIZE);
 
     if (bytesWritten == -1) {
         printf("could not write page to file");
